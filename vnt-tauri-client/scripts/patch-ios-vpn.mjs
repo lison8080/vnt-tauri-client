@@ -195,11 +195,14 @@ function patchProject() {
   if (!pbx.includes('PacketTunnel')) {
     fail('Generated iOS project does not include PacketTunnel target');
   }
+  if (!pbx.includes('VntIosVpnApp')) {
+    fail('Generated iOS project does not include VntIosVpnApp sources');
+  }
   if (!pbx.includes('VntIosVpnBridge.swift')) {
-    fail('Generated iOS project does not include VntIosVpnBridge.swift');
+    console.warn('Generated iOS project does not list VntIosVpnBridge.swift explicitly; xcodebuild will validate the synchronized source group.');
   }
   if (!pbx.includes('PacketTunnelProvider.swift')) {
-    fail('Generated iOS project does not include PacketTunnelProvider.swift');
+    console.warn('Generated iOS project does not list PacketTunnelProvider.swift explicitly; xcodebuild will validate the synchronized source group.');
   }
 }
 

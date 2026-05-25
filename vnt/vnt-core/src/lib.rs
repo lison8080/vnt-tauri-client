@@ -6,7 +6,7 @@ pub(crate) mod fec;
 pub mod nat;
 pub mod protocol;
 pub mod tls;
-pub(crate) mod tun;
+pub mod tun;
 pub mod tunnel_core;
 pub mod utils;
 

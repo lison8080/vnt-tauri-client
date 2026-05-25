@@ -11,7 +11,9 @@ use crate::nat::internal_nat::{InternalNatInbound, PortMappingManager};
 use crate::nat::{AllowSubnetExternalRoute, SubnetExternalRoute};
 use crate::protocol::control_message::ErrorResponseMsg;
 use crate::tun::enhanced_tun::EnhancedTunInbound;
-use crate::tun::{DeviceConfig, DeviceIOManager, TunDataInbound, TunReceiver, tun_channel};
+use crate::tun::{
+    DeviceConfig, DeviceIOManager, PacketFlowDevice, TunDataInbound, TunReceiver, tun_channel,
+};
 use crate::tunnel_core::outbound::{BasicOutbound, HybridOutbound};
 use crate::tunnel_core::p2p::inbound::{P2pInboundConfig, P2pInboundHandler};
 use crate::tunnel_core::p2p::transport::punch::NatPuncher;
@@ -322,6 +324,20 @@ impl NetworkManager {
         }
         self.device_io_manager
             .start_task(config, receiver, enhanced_outbound)
+            .await
+    }
+    pub async fn start_packet_flow(
+        &mut self,
+        packet_flow_device: PacketFlowDevice,
+    ) -> anyhow::Result<()> {
+        let Some(receiver) = self.tun_receiver.take() else {
+            bail!("start_packet_flow can only be called once");
+        };
+        let Some(enhanced_outbound) = self.enhanced_outbound.take() else {
+            bail!("start_packet_flow can only be called once");
+        };
+        self.device_io_manager
+            .start_packet_flow_task(receiver, packet_flow_device, enhanced_outbound)
             .await
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]

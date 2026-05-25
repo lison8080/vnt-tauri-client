@@ -1,4 +1,6 @@
 mod embedded;
+mod ios_packet_flow;
+mod ios_vpn;
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -234,6 +236,38 @@ pub struct AppRuntime {
 
 pub enum ManagedConnection {
     Embedded(embedded::manager::EmbeddedConnection),
+    #[cfg(target_os = "ios")]
+    IosVpn(IosVpnConnection),
+}
+
+#[cfg(target_os = "ios")]
+pub struct IosVpnConnection {
+    pub item_key: String,
+    pub config_name: String,
+    pub core_mode: String,
+    pub started_at: String,
+    pub command_preview: Vec<String>,
+    pub logs: Vec<String>,
+}
+
+#[cfg(target_os = "ios")]
+impl IosVpnConnection {
+    fn view(&self) -> ConnectionView {
+        ConnectionView {
+            item_key: self.item_key.clone(),
+            config_name: self.config_name.clone(),
+            core_mode: self.core_mode.clone(),
+            status: "connected".to_string(),
+            temporary_exit_ip: None,
+            temporary_exit_name: None,
+            pid: None,
+            started_at: self.started_at.clone(),
+            command_preview: self.command_preview.clone(),
+            logs: self.logs.clone(),
+            last_error: None,
+            exit_code: None,
+        }
+    }
 }
 
 fn storage_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -290,7 +324,7 @@ fn force_tun_config(config: &mut NetworkConfig) {
 }
 
 fn apply_platform_startup_limits(config: &mut NetworkConfig) {
-    #[cfg(any(target_os = "android", target_os = "ios"))]
+    #[cfg(target_os = "android")]
     {
         config.no_tun = true;
         config.no_punch = true;
@@ -298,6 +332,17 @@ fn apply_platform_startup_limits(config: &mut NetworkConfig) {
         config.allow_port_mapping = false;
         config.in_ips.clear();
         config.out_ips.clear();
+        config.port_mappings.clear();
+        config.use_channel_type = "relay".to_string();
+    }
+
+    #[cfg(target_os = "ios")]
+    {
+        config.no_tun = false;
+        config.no_punch = true;
+        config.no_in_ip_proxy = true;
+        config.allow_port_mapping = false;
+        config.in_ips.clear();
         config.port_mappings.clear();
         config.use_channel_type = "relay".to_string();
     }
@@ -367,6 +412,8 @@ fn core_available(_app: &AppHandle) -> bool {
 fn connection_view(connection: &mut ManagedConnection) -> ConnectionView {
     match connection {
         ManagedConnection::Embedded(connection) => connection.view(),
+        #[cfg(target_os = "ios")]
+        ManagedConnection::IosVpn(connection) => connection.view(),
     }
 }
 
@@ -481,6 +528,10 @@ fn push_runtime_log(runtime: &AppRuntime, line: impl Into<String>) {
 fn terminate_connection(connection: ManagedConnection) {
     match connection {
         ManagedConnection::Embedded(connection) => connection.stop(),
+        #[cfg(target_os = "ios")]
+        ManagedConnection::IosVpn(_) => {
+            let _ = ios_vpn::stop();
+        }
     }
 }
 
@@ -696,8 +747,10 @@ fn start_config_inner(
         .ok_or_else(|| "未找到要连接的配置".to_string())?;
     force_tun_config(&mut config);
     apply_platform_startup_limits(&mut config);
-    #[cfg(any(target_os = "android", target_os = "ios"))]
-    push_runtime_log(runtime, "移动端使用无 TUN/无 P2P 沙盒兼容模式");
+    #[cfg(target_os = "android")]
+    push_runtime_log(runtime, "Android 使用无 TUN/无 P2P 沙盒兼容模式");
+    #[cfg(target_os = "ios")]
+    push_runtime_log(runtime, "iOS 使用系统 VPN NetworkExtension 模式");
     validate_config(&config)?;
     push_runtime_log(
         runtime,
@@ -744,6 +797,11 @@ fn start_embedded_config_inner(
     config: NetworkConfig,
     temporary_exit: Option<(String, String)>,
 ) -> Result<AppSnapshot, String> {
+    #[cfg(target_os = "ios")]
+    {
+        return start_ios_vpn_config_inner(app, runtime, config, temporary_exit);
+    }
+
     #[cfg(target_os = "android")]
     init_android_logger();
     #[cfg(windows)]
@@ -762,6 +820,42 @@ fn start_embedded_config_inner(
         .lock()
         .map_err(|_| "连接状态锁已损坏".to_string())?
         .insert(item_key, ManagedConnection::Embedded(connection));
+
+    snapshot(app, runtime)
+}
+
+#[cfg(target_os = "ios")]
+fn start_ios_vpn_config_inner(
+    app: &AppHandle,
+    runtime: &AppRuntime,
+    config: NetworkConfig,
+    temporary_exit: Option<(String, String)>,
+) -> Result<AppSnapshot, String> {
+    if temporary_exit.is_some() {
+        return Err("iOS 系统 VPN 模式暂不支持临时出口切换".to_string());
+    }
+
+    let command_preview = embedded::preview::command_preview(&config);
+    let profile = ios_vpn::IosVpnProfile::from(&config);
+    ios_vpn::start(&profile).map_err(|error| format!("启动 iOS 系统 VPN 失败: {error:#}"))?;
+
+    let connection = IosVpnConnection {
+        item_key: config.item_key.clone(),
+        config_name: config.config_name.clone(),
+        core_mode: "ios-vpn".to_string(),
+        started_at: chrono::Utc::now().to_rfc3339(),
+        command_preview: command_preview.display,
+        logs: vec![
+            "[app] iOS NetworkExtension VPN requested".to_string(),
+            "[app] PacketTunnelProvider owns VNT packet flow on iOS".to_string(),
+        ],
+    };
+
+    runtime
+        .connections
+        .lock()
+        .map_err(|_| "连接状态锁已损坏".to_string())?
+        .insert(config.item_key, ManagedConnection::IosVpn(connection));
 
     snapshot(app, runtime)
 }

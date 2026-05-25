@@ -1,5 +1,5 @@
 export type TabType = 'home' | 'network' | 'settings';
-export type CoreMode = 'tun';
+export type CoreMode = 'tun' | 'ios-vpn';
 export type ConnectionStatus = 'connecting' | 'connected' | 'stopped' | 'error';
 export type ThemeMode = 'light' | 'dark';
 export type ThemePreference = 'system' | ThemeMode;

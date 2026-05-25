@@ -23,7 +23,7 @@ pub struct DeviceIOManager {
 }
 type DeviceMutex = Arc<tokio::sync::Mutex<(Option<DeviceTask>, Option<(Ipv4Addr, u8)>)>>;
 pub struct DeviceTask {
-    device: Arc<AsyncDevice>,
+    device: Option<Arc<AsyncDevice>>,
     task_recv: SubTask,
     task_send: SubTask,
 }
@@ -57,6 +57,24 @@ pub struct TunInbound {
 
 pub struct TunReceiver {
     receiver: Receiver<TransmissionBytes>,
+}
+pub type PacketFlowWriter = Arc<dyn Fn(Vec<u8>) + Send + Sync + 'static>;
+
+pub struct PacketFlowDevice {
+    packet_flow_rx: Receiver<Vec<u8>>,
+    packet_flow_writer: PacketFlowWriter,
+}
+
+impl PacketFlowDevice {
+    pub fn new(
+        packet_flow_rx: Receiver<Vec<u8>>,
+        packet_flow_writer: impl Fn(Vec<u8>) + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            packet_flow_rx,
+            packet_flow_writer: Arc::new(packet_flow_writer),
+        }
+    }
 }
 pub fn tun_channel() -> (TunInbound, TunReceiver) {
     let (sender, receiver) = tokio::sync::mpsc::channel(1024);
@@ -93,11 +111,29 @@ impl DeviceIOManager {
         self.device.lock().await.0.replace(task);
         Ok(())
     }
+    pub async fn start_packet_flow_task(
+        &self,
+        receiver: TunReceiver,
+        packet_flow_device: PacketFlowDevice,
+        enhanced_outbound: EnhancedOutbound,
+    ) -> anyhow::Result<()> {
+        self.stop_task().await;
+        let task = create_packet_flow(
+            &self.task_group,
+            receiver.receiver,
+            packet_flow_device,
+            enhanced_outbound,
+        );
+        self.device.lock().await.0.replace(task);
+        Ok(())
+    }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     pub async fn tun_if_index(&self) -> anyhow::Result<u32> {
         let guard = self.device.lock().await;
-        if let Some(v) = &guard.0 {
-            Ok(v.device.if_index()?)
+        if let Some(v) = &guard.0
+            && let Some(device) = &v.device
+        {
+            Ok(device.if_index()?)
         } else {
             bail!("device doesn't exist")
         }
@@ -115,13 +151,16 @@ impl DeviceIOManager {
             let Some(dev) = guard.0.as_ref() else {
                 bail!("未启动tun")
             };
+            let Some(device) = dev.device.as_ref() else {
+                bail!("TUN device doesn't exist")
+            };
             if let Some(v) = guard.1.as_ref()
                 && v.0 == ip
                 && v.1 == prefix_len
             {
                 return Ok(());
             }
-            dev.device
+            device
                 .set_network_address(ip, prefix_len, None)
                 .context("设置IP失败")?;
             guard.1 = Some((ip, prefix_len));
@@ -200,10 +239,47 @@ fn create(
     });
 
     Ok(DeviceTask {
-        device,
+        device: Some(device),
         task_recv,
         task_send,
     })
+}
+
+fn create_packet_flow(
+    task_group: &TaskGroup,
+    receiver: Receiver<TransmissionBytes>,
+    packet_flow_device: PacketFlowDevice,
+    enhanced_outbound: EnhancedOutbound,
+) -> DeviceTask {
+    let PacketFlowDevice {
+        mut packet_flow_rx,
+        packet_flow_writer,
+    } = packet_flow_device;
+    let writer = packet_flow_writer.clone();
+
+    let task_recv = task_group.spawn(async move {
+        let mut receiver = receiver;
+        while let Some(data) = receiver.recv().await {
+            writer(data.as_ref().to_vec());
+        }
+    });
+
+    let task_send = task_group.spawn(async move {
+        while let Some(packet) = packet_flow_rx.recv().await {
+            let mut bytes = TransmissionBytes::new_offset(HEAD_LENGTH);
+            if let Err(error) = bytes.put(&packet) {
+                log::warn!("packet flow inbound packet rejected: {error:?}");
+                continue;
+            }
+            enhanced_outbound.ipv4_outbound(bytes).await;
+        }
+    });
+
+    DeviceTask {
+        device: None,
+        task_recv,
+        task_send,
+    }
 }
 
 async fn in_tun_loop(

@@ -196,6 +196,9 @@ jobs:
             npm run tauri -- ios init --ci
           fi
 
+      - name: Patch iOS VPN bridge
+        run: node scripts/patch-ios-vpn.mjs
+
       - name: Build iOS Rust library
         working-directory: vnt-tauri-client/src-tauri
         run: cargo build --release --target aarch64-apple-ios

@@ -32,7 +32,7 @@ targets:
     platform: iOS
     sources:
       - path: Sources
-      - path: VntIosVpn/VntIosVpnBridge.swift
+      - path: VntIosVpnApp
       - path: Assets.xcassets
       - path: Externals
       - path: {{app.name}}_iOS
@@ -178,9 +178,9 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - path: VntIosVpn/PacketTunnelProvider.swift
+      - path: VntIosVpnTunnel
     info:
-      path: VntIosVpn/PacketTunnelInfo.plist
+      path: VntIosVpnTunnel/PacketTunnelInfo.plist
       properties:
         CFBundleDisplayName: VNT Packet Tunnel
         CFBundleExecutable: $(EXECUTABLE_NAME)
@@ -194,7 +194,7 @@ targets:
           NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
     entitlements:
-      path: VntIosVpn/PacketTunnel.entitlements
+      path: VntIosVpnTunnel/PacketTunnel.entitlements
       properties:
         com.apple.developer.networking.networkextension:
           - packet-tunnel-provider

@@ -193,11 +193,19 @@ jobs:
             exit 1
           fi
           if [ ! -d src-tauri/gen/apple ]; then
+            mkdir -p src-tauri/gen/apple/VntIosVpn
+            cp src-tauri/ios/VntIosVpnBridge.swift src-tauri/gen/apple/VntIosVpn/VntIosVpnBridge.swift
+            cp src-tauri/ios/PacketTunnelProvider.swift src-tauri/gen/apple/VntIosVpn/PacketTunnelProvider.swift
             npm run tauri -- ios init --ci
           fi
 
       - name: Patch iOS VPN bridge
-        run: node scripts/patch-ios-vpn.mjs
+        run: |
+          set -euo pipefail
+          mkdir -p src-tauri/gen/apple/VntIosVpn
+          cp src-tauri/ios/VntIosVpnBridge.swift src-tauri/gen/apple/VntIosVpn/VntIosVpnBridge.swift
+          cp src-tauri/ios/PacketTunnelProvider.swift src-tauri/gen/apple/VntIosVpn/PacketTunnelProvider.swift
+          node scripts/patch-ios-vpn.mjs
 
       - name: Build iOS Rust library
         working-directory: vnt-tauri-client/src-tauri

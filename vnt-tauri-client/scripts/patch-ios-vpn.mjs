@@ -144,7 +144,7 @@ function packetTunnelInfoPlist({ identifier, version }) {
 `);
 }
 
-function ensureGeneratedAppleFiles() {
+function loadProjectMetadata() {
   const tauri = readJson(path.join(srcTauri, 'tauri.conf.json'));
   const pkg = readJson(path.join(root, 'package.json'));
   const appName = pkg.name;
@@ -156,6 +156,11 @@ function ensureGeneratedAppleFiles() {
     fail('Unable to derive iOS app name, identifier, or version from package.json/tauri.conf.json');
   }
 
+  return { appName, productName, identifier, version };
+}
+
+function ensureGeneratedAppleFiles(metadata) {
+  const { appName, productName, identifier, version } = metadata;
   const appDir = path.join(genApple, `${appName}_iOS`);
   const tunnelDir = path.join(genApple, 'VntIosVpnTunnel');
 
@@ -165,11 +170,38 @@ function ensureGeneratedAppleFiles() {
   writeIfChanged(path.join(tunnelDir, 'PacketTunnel.entitlements'), networkExtensionEntitlements());
 }
 
-function regenerateProject() {
-  if (!fs.existsSync(path.join(genApple, 'project.yml'))) {
+function pruneGeneratedProject(metadata) {
+  const projectSpec = path.join(genApple, 'project.yml');
+  if (!fs.existsSync(projectSpec)) {
     fail('Unable to locate generated iOS project.yml');
   }
 
+  const appTarget = `${metadata.appName}_iOS:`;
+  let inAppTarget = false;
+  let removed = 0;
+  const lines = fs.readFileSync(projectSpec, 'utf8').split('\n');
+  const next = lines.filter((line) => {
+    if (line === `  ${appTarget}`) {
+      inAppTarget = true;
+      return true;
+    }
+    if (inAppTarget && /^  [A-Za-z0-9_-]+:/.test(line) && line !== `  ${appTarget}`) {
+      inAppTarget = false;
+    }
+    if (inAppTarget && line.trim() === '- path: VntIosVpnTunnel') {
+      removed += 1;
+      return false;
+    }
+    return true;
+  }).join('\n');
+
+  if (removed > 0) {
+    fs.writeFileSync(projectSpec, next, 'utf8');
+    console.log(`Removed ${removed} PacketTunnel source leak from ${path.relative(root, projectSpec)}`);
+  }
+}
+
+function regenerateProject() {
   const result = spawnSync('xcodegen', ['generate', '--spec', 'project.yml'], {
     cwd: genApple,
     stdio: 'inherit',
@@ -206,7 +238,9 @@ function patchProject() {
   }
 }
 
-ensureGeneratedAppleFiles();
+const metadata = loadProjectMetadata();
+ensureGeneratedAppleFiles(metadata);
+pruneGeneratedProject(metadata);
 regenerateProject();
 patchProject();
 console.log('iOS VPN Xcode project includes PacketTunnel target and bridge sources');

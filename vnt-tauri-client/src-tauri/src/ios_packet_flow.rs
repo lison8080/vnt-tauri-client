@@ -1,6 +1,7 @@
 #[cfg(target_os = "ios")]
 mod ios {
     use std::collections::HashMap;
+    use std::ffi::CString;
     use std::os::raw::{c_char, c_uchar};
     use std::sync::{Mutex, OnceLock};
 
@@ -23,6 +24,18 @@ mod ios {
         task_group_manager: TaskGroupManager,
         guard: TaskGroupGuard,
         packet_tx: Sender<Vec<u8>>,
+        network_json: CString,
+    }
+
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct IosPacketFlowNetwork {
+        ip: String,
+        prefix_len: u8,
+        network: String,
+        subnet_mask: String,
+        gateway: String,
+        mtu: u16,
     }
 
     static SESSIONS: OnceLock<Mutex<HashMap<u64, IosPacketFlowSession>>> = OnceLock::new();
@@ -79,6 +92,29 @@ mod ios {
         }
     }
 
+    #[no_mangle]
+    pub extern "C" fn vnt_ios_packet_flow_network_json(session_id: u64) -> *mut c_char {
+        let Some(lock) = SESSIONS.get() else {
+            return std::ptr::null_mut();
+        };
+        let Ok(sessions) = lock.lock() else {
+            return std::ptr::null_mut();
+        };
+        let Some(session) = sessions.get(&session_id) else {
+            return std::ptr::null_mut();
+        };
+        session.network_json.clone().into_raw()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn vnt_ios_packet_flow_free_string(value: *mut c_char) {
+        if !value.is_null() {
+            unsafe {
+                drop(CString::from_raw(value));
+            }
+        }
+    }
+
     fn start(
         profile_json: *const c_char,
         packet_writer: Option<PacketWriteCallback>,
@@ -99,15 +135,15 @@ mod ios {
         let (packet_tx, packet_rx) = mpsc::channel::<Vec<u8>>(1024);
         let session_id = next_session_id();
 
-        let network_manager = runtime.block_on(async {
+        let (network_manager, assigned_network) = runtime.block_on(async {
             let mut network_manager = NetworkManager::create_network(Box::new(core_config), task_group)
                 .await?;
-            match network_manager.register().await? {
-                RegisterResponse::Success(_) => {}
+            let assigned_network = match network_manager.register().await? {
+                RegisterResponse::Success(network) => network,
                 RegisterResponse::Failed(error) => {
                     anyhow::bail!("embedded VNT registration failed ({}): {}", error.code, error.message);
                 }
-            }
+            };
 
             let packet_flow = PacketFlowDevice::new(packet_rx, move |packet| {
                 if let Some(packet_writer) = packet_writer {
@@ -115,8 +151,16 @@ mod ios {
                 }
             });
             network_manager.start_packet_flow(packet_flow).await?;
-            anyhow::Ok(network_manager)
+            anyhow::Ok((network_manager, assigned_network))
         })?;
+        let network_json = CString::new(serde_json::to_string(&IosPacketFlowNetwork {
+            ip: assigned_network.ip.to_string(),
+            prefix_len: assigned_network.prefix_len,
+            network: assigned_network.network().network().to_string(),
+            subnet_mask: prefix_to_mask(assigned_network.prefix_len).to_string(),
+            gateway: assigned_network.gateway.to_string(),
+            mtu: network_config.mtu.try_into().unwrap_or(1380),
+        })?)?;
 
         let session = IosPacketFlowSession {
             network_manager,
@@ -124,6 +168,7 @@ mod ios {
             task_group_manager,
             guard,
             packet_tx,
+            network_json,
         };
         let lock = SESSIONS.get_or_init(|| Mutex::new(HashMap::new()));
         lock.lock()
@@ -181,5 +226,14 @@ mod ios {
         use std::sync::atomic::{AtomicU64, Ordering};
         static NEXT: AtomicU64 = AtomicU64::new(1);
         NEXT.fetch_add(1, Ordering::Relaxed)
+    }
+
+    fn prefix_to_mask(prefix_len: u8) -> std::net::Ipv4Addr {
+        let mask = if prefix_len == 0 {
+            0
+        } else {
+            u32::MAX << (32 - u32::from(prefix_len))
+        };
+        std::net::Ipv4Addr::from(mask)
     }
 }

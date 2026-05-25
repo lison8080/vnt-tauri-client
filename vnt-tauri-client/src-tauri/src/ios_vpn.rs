@@ -45,13 +45,57 @@ impl From<&NetworkConfig> for IosVpnProfile {
     }
 }
 
+#[cfg(target_os = "ios")]
+mod native {
+    use super::IosVpnProfile;
+    use anyhow::{anyhow, Context};
+    use std::ffi::{CStr, CString};
+    use std::os::raw::{c_char, c_int};
+
+    unsafe extern "C" {
+        fn vnt_ios_vpn_start(profile_json: *const c_char) -> c_int;
+        fn vnt_ios_vpn_stop() -> c_int;
+        fn vnt_ios_vpn_last_error() -> *const c_char;
+    }
+
+    pub fn start(profile: &IosVpnProfile) -> anyhow::Result<()> {
+        let json = serde_json::to_string(profile).context("serialize iOS VPN profile")?;
+        let json = CString::new(json).context("iOS VPN profile contains NUL byte")?;
+        let result = unsafe { vnt_ios_vpn_start(json.as_ptr()) };
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(anyhow!(last_error()))
+        }
+    }
+
+    pub fn stop() -> anyhow::Result<()> {
+        let result = unsafe { vnt_ios_vpn_stop() };
+        if result == 0 {
+            Ok(())
+        } else {
+            Err(anyhow!(last_error()))
+        }
+    }
+
+    fn last_error() -> String {
+        let raw = unsafe { vnt_ios_vpn_last_error() };
+        if raw.is_null() {
+            return "iOS VPN native bridge failed".to_string();
+        }
+        unsafe { CStr::from_ptr(raw) }
+            .to_string_lossy()
+            .trim()
+            .to_string()
+    }
+}
+
+#[cfg(not(target_os = "ios"))]
 mod native {
     use super::IosVpnProfile;
 
     pub fn start(_profile: &IosVpnProfile) -> anyhow::Result<()> {
-        anyhow::bail!(
-            "iOS NetworkExtension target is not linked in this build; configure Apple signing and enable the PacketTunnelProvider target"
-        )
+        anyhow::bail!("iOS VPN bridge is only available on iOS")
     }
 
     pub fn stop() -> anyhow::Result<()> {

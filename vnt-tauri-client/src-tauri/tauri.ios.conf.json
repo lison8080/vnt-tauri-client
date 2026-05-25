@@ -1,0 +1,10 @@
+{
+  "bundle": {
+    "iOS": {
+      "template": "ios-template/project.yml",
+      "frameworks": [
+        "NetworkExtension"
+      ]
+    }
+  }
+}

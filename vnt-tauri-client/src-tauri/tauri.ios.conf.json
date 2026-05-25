@@ -1,7 +1,7 @@
 {
   "bundle": {
     "iOS": {
-      "template": "ios-template/project.yml",
+      "template": "src-tauri/ios-template/project.yml",
       "frameworks": [
         "NetworkExtension"
       ]

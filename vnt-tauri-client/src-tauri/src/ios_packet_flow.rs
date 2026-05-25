@@ -59,10 +59,10 @@ mod ios {
         let Some(lock) = SESSIONS.get() else {
             return;
         };
-        if let Ok(sessions) = lock.lock()
-            && let Some(session) = sessions.get(&session_id)
-        {
-            let _ = session.packet_tx.try_send(packet);
+        if let Ok(sessions) = lock.lock() {
+            if let Some(session) = sessions.get(&session_id) {
+                let _ = session.packet_tx.try_send(packet);
+            }
         }
     }
 
@@ -71,11 +71,11 @@ mod ios {
         let Some(lock) = SESSIONS.get() else {
             return;
         };
-        if let Ok(mut sessions) = lock.lock()
-            && let Some(session) = sessions.remove(&session_id)
-        {
-            session.task_group_manager.stop();
-            drop(session);
+        if let Ok(mut sessions) = lock.lock() {
+            if let Some(session) = sessions.remove(&session_id) {
+                session.task_group_manager.stop();
+                drop(session);
+            }
         }
     }
 

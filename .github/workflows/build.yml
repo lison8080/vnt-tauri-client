@@ -214,16 +214,18 @@ jobs:
             python3 -c 'import json, sys; data = json.load(sys.stdin); root = data.get("workspace") or data.get("project") or {}; schemes = root.get("schemes") or []; print(schemes[0] if schemes else "")'
           }
 
-          workspace="$(find "$gen_dir" -name '*.xcworkspace' -print -quit)"
           project="$(find "$gen_dir" -name '*.xcodeproj' -print -quit)"
+          workspace="$(find "$gen_dir" -name '*.xcworkspace' ! -path '*.xcodeproj/*' -print -quit)"
+          configuration="release"
 
           if [ -n "$workspace" ]; then
             scheme="$(xcodebuild -list -json -workspace "$workspace" | extract_first_scheme)"
             [ -n "$scheme" ] || { echo "::error::No Xcode scheme found in $workspace"; exit 1; }
+            echo "Building $workspace scheme=$scheme configuration=$configuration"
             xcodebuild \
               -workspace "$workspace" \
               -scheme "$scheme" \
-              -configuration Release \
+              -configuration "$configuration" \
               -sdk iphoneos \
               -destination 'generic/platform=iOS' \
               -derivedDataPath "$derived_data" \
@@ -235,10 +237,11 @@ jobs:
           elif [ -n "$project" ]; then
             scheme="$(xcodebuild -list -json -project "$project" | extract_first_scheme)"
             [ -n "$scheme" ] || { echo "::error::No Xcode scheme found in $project"; exit 1; }
+            echo "Building $project scheme=$scheme configuration=$configuration"
             xcodebuild \
               -project "$project" \
               -scheme "$scheme" \
-              -configuration Release \
+              -configuration "$configuration" \
               -sdk iphoneos \
               -destination 'generic/platform=iOS' \
               -derivedDataPath "$derived_data" \
@@ -252,7 +255,7 @@ jobs:
             exit 1
           fi
 
-          app_path="$(find "$derived_data/Build/Products/Release-iphoneos" "$gen_dir" -type d -name '*.app' -print -quit 2>/dev/null || true)"
+          app_path="$(find "$derived_data/Build/Products" "$gen_dir" -type d -name '*.app' -path '*iphoneos*' -print -quit 2>/dev/null || true)"
           if [ -z "$app_path" ]; then
             echo "::error::No unsigned iOS .app bundle was produced."
             exit 1

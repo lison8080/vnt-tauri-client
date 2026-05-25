@@ -177,6 +177,9 @@ targets:
     platform: iOS
     sources:
       - path: VntIosVpnTunnel
+        excludes:
+          - PacketTunnelInfo.plist
+          - PacketTunnel.entitlements
     info:
       path: VntIosVpnTunnel/PacketTunnelInfo.plist
       properties:

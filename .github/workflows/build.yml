@@ -212,6 +212,7 @@ jobs:
           path: release-artifacts
 
       - name: Package release assets
+        working-directory: .
         run: |
           set -euo pipefail
           mkdir -p release-assets

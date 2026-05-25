@@ -1,11 +1,12 @@
 #!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const genApple = path.join(root, 'src-tauri', 'gen', 'apple');
-const iosSource = path.join(root, 'src-tauri', 'ios');
+const srcTauri = path.join(root, 'src-tauri');
+const genApple = path.join(srcTauri, 'gen', 'apple');
 
 function fail(message) {
   console.error(message);
@@ -30,38 +31,55 @@ function findFile(dir, name) {
   return null;
 }
 
-function copyBridgeSources() {
-  const appSwiftDir = findFile(genApple, 'Info.plist');
-  if (!appSwiftDir) {
-    fail('Unable to locate generated iOS Info.plist');
-  }
-  const appDir = path.dirname(appSwiftDir);
-  const targetDir = path.join(appDir, 'VntIosVpn');
-  fs.mkdirSync(targetDir, { recursive: true });
-
-  fs.copyFileSync(path.join(iosSource, 'VntIosVpnBridge.swift'), path.join(targetDir, 'VntIosVpnBridge.swift'));
-  fs.copyFileSync(path.join(iosSource, 'PacketTunnelProvider.swift'), path.join(targetDir, 'PacketTunnelProvider.swift.template'));
-
-  const extensionInfo = path.join(targetDir, 'PacketTunnelInfo.plist');
-  if (!fs.existsSync(extensionInfo)) {
-    fs.writeFileSync(extensionInfo, packetTunnelInfoPlist(), 'utf8');
-  }
-  return { appDir, targetDir };
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
-function packetTunnelInfoPlist() {
+function xml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+function writeIfChanged(file, contents) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (fs.existsSync(file) && fs.readFileSync(file, 'utf8') === contents) {
+    return;
+  }
+  fs.writeFileSync(file, contents, 'utf8');
+  console.log(`Wrote ${path.relative(root, file)}`);
+}
+
+function plist(body) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleDevelopmentRegion</key>
+${body}</dict>
+</plist>
+`;
+}
+
+function networkExtensionEntitlements() {
+  return plist(`  <key>com.apple.developer.networking.networkextension</key>
+  <array>
+    <string>packet-tunnel-provider</string>
+  </array>
+`);
+}
+
+function appInfoPlist({ productName, identifier, version }) {
+  return plist(`  <key>CFBundleDevelopmentRegion</key>
   <string>$(DEVELOPMENT_LANGUAGE)</string>
   <key>CFBundleDisplayName</key>
-  <string>VNT Packet Tunnel</string>
+  <string>${xml(productName)}</string>
   <key>CFBundleExecutable</key>
   <string>$(EXECUTABLE_NAME)</string>
   <key>CFBundleIdentifier</key>
-  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+  <string>${xml(identifier)}</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
@@ -69,9 +87,53 @@ function packetTunnelInfoPlist() {
   <key>CFBundlePackageType</key>
   <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
   <key>CFBundleShortVersionString</key>
-  <string>$(MARKETING_VERSION)</string>
+  <string>${xml(version)}</string>
   <key>CFBundleVersion</key>
-  <string>$(CURRENT_PROJECT_VERSION)</string>
+  <string>${xml(version)}</string>
+  <key>LSRequiresIPhoneOS</key>
+  <true/>
+  <key>UILaunchStoryboardName</key>
+  <string>LaunchScreen</string>
+  <key>UIRequiredDeviceCapabilities</key>
+  <array>
+    <string>arm64</string>
+    <string>metal</string>
+  </array>
+  <key>UISupportedInterfaceOrientations</key>
+  <array>
+    <string>UIInterfaceOrientationPortrait</string>
+    <string>UIInterfaceOrientationLandscapeLeft</string>
+    <string>UIInterfaceOrientationLandscapeRight</string>
+  </array>
+  <key>UISupportedInterfaceOrientations~ipad</key>
+  <array>
+    <string>UIInterfaceOrientationPortrait</string>
+    <string>UIInterfaceOrientationPortraitUpsideDown</string>
+    <string>UIInterfaceOrientationLandscapeLeft</string>
+    <string>UIInterfaceOrientationLandscapeRight</string>
+  </array>
+`);
+}
+
+function packetTunnelInfoPlist({ identifier, version }) {
+  return plist(`  <key>CFBundleDevelopmentRegion</key>
+  <string>$(DEVELOPMENT_LANGUAGE)</string>
+  <key>CFBundleDisplayName</key>
+  <string>VNT Packet Tunnel</string>
+  <key>CFBundleExecutable</key>
+  <string>$(EXECUTABLE_NAME)</string>
+  <key>CFBundleIdentifier</key>
+  <string>${xml(identifier)}.PacketTunnel</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>$(PRODUCT_NAME)</string>
+  <key>CFBundlePackageType</key>
+  <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+  <key>CFBundleShortVersionString</key>
+  <string>${xml(version)}</string>
+  <key>CFBundleVersion</key>
+  <string>${xml(version)}</string>
   <key>NSExtension</key>
   <dict>
     <key>NSExtensionPointIdentifier</key>
@@ -79,9 +141,45 @@ function packetTunnelInfoPlist() {
     <key>NSExtensionPrincipalClass</key>
     <string>$(PRODUCT_MODULE_NAME).PacketTunnelProvider</string>
   </dict>
-</dict>
-</plist>
-`;
+`);
+}
+
+function ensureGeneratedAppleFiles() {
+  const tauri = readJson(path.join(srcTauri, 'tauri.conf.json'));
+  const pkg = readJson(path.join(root, 'package.json'));
+  const appName = pkg.name;
+  const productName = tauri.productName ?? appName;
+  const identifier = tauri.identifier;
+  const version = tauri.version ?? pkg.version;
+
+  if (!appName || !identifier || !version) {
+    fail('Unable to derive iOS app name, identifier, or version from package.json/tauri.conf.json');
+  }
+
+  const appDir = path.join(genApple, `${appName}_iOS`);
+  const tunnelDir = path.join(genApple, 'VntIosVpnTunnel');
+
+  writeIfChanged(path.join(appDir, 'Info.plist'), appInfoPlist({ productName, identifier, version }));
+  writeIfChanged(path.join(appDir, `${appName}_iOS.entitlements`), networkExtensionEntitlements());
+  writeIfChanged(path.join(tunnelDir, 'PacketTunnelInfo.plist'), packetTunnelInfoPlist({ identifier, version }));
+  writeIfChanged(path.join(tunnelDir, 'PacketTunnel.entitlements'), networkExtensionEntitlements());
+}
+
+function regenerateProject() {
+  if (!fs.existsSync(path.join(genApple, 'project.yml'))) {
+    fail('Unable to locate generated iOS project.yml');
+  }
+
+  const result = spawnSync('xcodegen', ['generate', '--spec', 'project.yml'], {
+    cwd: genApple,
+    stdio: 'inherit',
+  });
+  if (result.error) {
+    fail(`Unable to run xcodegen: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    fail(`xcodegen failed with status ${result.status}`);
+  }
 }
 
 function patchProject() {
@@ -98,9 +196,14 @@ function patchProject() {
     fail('Generated iOS project does not include PacketTunnel target');
   }
   if (!pbx.includes('VntIosVpnBridge.swift')) {
-    console.warn('Generated iOS project does not list VntIosVpnBridge.swift explicitly; continuing so xcodebuild can validate linkage.');
+    fail('Generated iOS project does not include VntIosVpnBridge.swift');
+  }
+  if (!pbx.includes('PacketTunnelProvider.swift')) {
+    fail('Generated iOS project does not include PacketTunnelProvider.swift');
   }
 }
 
+ensureGeneratedAppleFiles();
+regenerateProject();
 patchProject();
 console.log('iOS VPN Xcode project includes PacketTunnel target and bridge sources');

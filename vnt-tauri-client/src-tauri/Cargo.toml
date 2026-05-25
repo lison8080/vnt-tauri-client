@@ -34,3 +34,6 @@ vnt-core = { path = "../../vnt/vnt-core" }
 android_logger = "0.13"
 jni = "0.21"
 ndk-context = "0.1"
+
+[patch.crates-io]
+machine-uid = { path = "patches/machine-uid" }

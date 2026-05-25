@@ -16,7 +16,7 @@ pub fn to_core_config(config: &NetworkConfig) -> anyhow::Result<CoreConfig> {
         .map(|value| {
             value
                 .parse::<NetInput>()
-                .with_context(|| format!("invalid input route '{value}'"))
+                .map_err(|error| anyhow!("invalid input route '{value}': {error}"))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
     let output = compact_list(&config.out_ips)
@@ -32,7 +32,7 @@ pub fn to_core_config(config: &NetworkConfig) -> anyhow::Result<CoreConfig> {
         .map(|value| {
             value
                 .parse::<PortMapping>()
-                .with_context(|| format!("invalid port mapping '{value}'"))
+                .map_err(|error| anyhow!("invalid port mapping '{value}': {error}"))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
     let ip = if config.virtual_ipv4.trim().is_empty() {
@@ -105,7 +105,7 @@ fn parse_server_address(config: &NetworkConfig) -> anyhow::Result<Vec<ProtocolAd
     };
     Ok(vec![uri
         .parse::<ProtocolAddress>()
-        .with_context(|| format!("invalid server address '{uri}'"))?])
+        .map_err(|error| anyhow!("invalid server address '{uri}': {error}"))?])
 }
 
 fn parse_cert_mode(value: &str) -> anyhow::Result<CertValidationMode> {

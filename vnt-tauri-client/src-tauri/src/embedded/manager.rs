@@ -2,6 +2,7 @@ use crate::{CommandPreview, ConnectionView, NetworkConfig};
 use anyhow::{anyhow, bail, Context};
 use chrono::Utc;
 use std::{
+    fmt::Display,
     net::Ipv4Addr,
     sync::{Arc, Mutex},
 };
@@ -197,7 +198,7 @@ fn temporary_exit_in_ip(device_ip: &str) -> anyhow::Result<String> {
     let route = format!("0.0.0.0/0,{ip}");
     route
         .parse::<NetInput>()
-        .with_context(|| format!("invalid temporary exit route '{route}'"))?;
+        .map_err(|error| anyhow!("invalid temporary exit route '{route}': {error}"))?;
     Ok(route)
 }
 
@@ -222,12 +223,12 @@ fn take_network_manager(network_manager: &Mutex<Option<NetworkManager>>) {
     }
 }
 
-fn record_error(
+fn record_error<E: Display + ?Sized>(
     logs: &Arc<Mutex<Vec<String>>>,
     last_error: &Arc<Mutex<Option<String>>>,
-    error: &anyhow::Error,
+    error: &E,
 ) {
-    let message = format!("{error:#}");
+    let message = error.to_string();
     if let Ok(mut last_error) = last_error.lock() {
         *last_error = Some(message.clone());
     }

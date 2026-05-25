@@ -1,0 +1,10 @@
+[package]
+name = "machine-uid"
+version = "0.5.4"
+edition = "2021"
+description = "Cross-target machine-uid compatibility shim for VNT builds"
+license = "MIT"
+
+[lib]
+name = "machine_uid"
+path = "src/lib.rs"

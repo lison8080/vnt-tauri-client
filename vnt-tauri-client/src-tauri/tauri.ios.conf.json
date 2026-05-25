@@ -1,10 +1,7 @@
 {
   "bundle": {
     "iOS": {
-      "template": "src-tauri/ios-template/project.yml",
-      "frameworks": [
-        "NetworkExtension"
-      ]
+      "template": "src-tauri/ios-template/project.yml"
     }
   }
 }

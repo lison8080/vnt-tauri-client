@@ -50,18 +50,23 @@ mod native {
     use super::IosVpnProfile;
     use anyhow::{anyhow, Context};
     use std::ffi::{CStr, CString};
-    use std::os::raw::{c_char, c_int};
+    use std::os::raw::{c_char, c_int, c_void};
 
     unsafe extern "C" {
-        fn vnt_ios_vpn_start(profile_json: *const c_char) -> c_int;
-        fn vnt_ios_vpn_stop() -> c_int;
-        fn vnt_ios_vpn_last_error() -> *const c_char;
+        fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
     }
+
+    const RTLD_DEFAULT: *mut c_void = (-2isize) as *mut c_void;
+
+    type StartFn = unsafe extern "C" fn(*const c_char) -> c_int;
+    type StopFn = unsafe extern "C" fn() -> c_int;
+    type LastErrorFn = unsafe extern "C" fn() -> *const c_char;
 
     pub fn start(profile: &IosVpnProfile) -> anyhow::Result<()> {
         let json = serde_json::to_string(profile).context("serialize iOS VPN profile")?;
         let json = CString::new(json).context("iOS VPN profile contains NUL byte")?;
-        let result = unsafe { vnt_ios_vpn_start(json.as_ptr()) };
+        let start = unsafe { resolve::<StartFn>("vnt_ios_vpn_start")? };
+        let result = unsafe { start(json.as_ptr()) };
         if result == 0 {
             Ok(())
         } else {
@@ -70,7 +75,8 @@ mod native {
     }
 
     pub fn stop() -> anyhow::Result<()> {
-        let result = unsafe { vnt_ios_vpn_stop() };
+        let stop = unsafe { resolve::<StopFn>("vnt_ios_vpn_stop")? };
+        let result = unsafe { stop() };
         if result == 0 {
             Ok(())
         } else {
@@ -79,7 +85,11 @@ mod native {
     }
 
     fn last_error() -> String {
-        let raw = unsafe { vnt_ios_vpn_last_error() };
+        let last_error = match unsafe { resolve::<LastErrorFn>("vnt_ios_vpn_last_error") } {
+            Ok(last_error) => last_error,
+            Err(error) => return error.to_string(),
+        };
+        let raw = unsafe { last_error() };
         if raw.is_null() {
             return "iOS VPN native bridge failed".to_string();
         }
@@ -87,6 +97,18 @@ mod native {
             .to_string_lossy()
             .trim()
             .to_string()
+    }
+
+    unsafe fn resolve<T>(symbol: &str) -> anyhow::Result<T>
+    where
+        T: Copy,
+    {
+        let symbol = CString::new(symbol).context("iOS VPN bridge symbol contains NUL byte")?;
+        let ptr = dlsym(RTLD_DEFAULT, symbol.as_ptr());
+        if ptr.is_null() {
+            anyhow::bail!("iOS VPN native bridge symbol not found: {}", symbol.to_string_lossy());
+        }
+        Ok(std::mem::transmute_copy(&ptr))
     }
 }
 

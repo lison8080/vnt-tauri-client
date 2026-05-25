@@ -204,72 +204,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          npm run build
-
-          gen_dir="src-tauri/gen/apple"
-          derived_data="$PWD/src-tauri/target/ios-derived-data"
-          mkdir -p "$derived_data"
-
-          extract_first_scheme() {
-            python3 -c 'import json, sys; data = json.load(sys.stdin); root = data.get("workspace") or data.get("project") or {}; schemes = root.get("schemes") or []; print(schemes[0] if schemes else "")'
-          }
-
-          project="$(find "$gen_dir" -name '*.xcodeproj' -print -quit)"
-          workspace="$(find "$gen_dir" -name '*.xcworkspace' ! -path '*.xcodeproj/*' -print -quit)"
-          configuration="release"
-
-          if [ -n "$workspace" ]; then
-            scheme="$(xcodebuild -list -json -workspace "$workspace" | extract_first_scheme)"
-            [ -n "$scheme" ] || { echo "::error::No Xcode scheme found in $workspace"; exit 1; }
-            echo "Building $workspace scheme=$scheme configuration=$configuration"
-            xcodebuild \
-              -workspace "$workspace" \
-              -scheme "$scheme" \
-              -configuration "$configuration" \
-              -sdk iphoneos \
-              -destination 'generic/platform=iOS' \
-              -derivedDataPath "$derived_data" \
-              CODE_SIGN_STYLE=Manual \
-              DEVELOPMENT_TEAM= \
-              CODE_SIGNING_ALLOWED=NO \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGN_IDENTITY=""
-          elif [ -n "$project" ]; then
-            scheme="$(xcodebuild -list -json -project "$project" | extract_first_scheme)"
-            [ -n "$scheme" ] || { echo "::error::No Xcode scheme found in $project"; exit 1; }
-            echo "Building $project scheme=$scheme configuration=$configuration"
-            xcodebuild \
-              -project "$project" \
-              -scheme "$scheme" \
-              -configuration "$configuration" \
-              -sdk iphoneos \
-              -destination 'generic/platform=iOS' \
-              -derivedDataPath "$derived_data" \
-              CODE_SIGN_STYLE=Manual \
-              DEVELOPMENT_TEAM= \
-              CODE_SIGNING_ALLOWED=NO \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGN_IDENTITY=""
-          else
-            echo "::error::No generated iOS Xcode project found under $gen_dir"
+          npm run tauri -- ios build --ci --no-sign --target aarch64
+          ipa_path="$(find src-tauri/gen/apple/build -type f -name '*.ipa' -print -quit)"
+          if [ -z "$ipa_path" ]; then
+            echo "::error::No unsigned iOS IPA was produced."
             exit 1
           fi
-
-          app_path="$(find "$derived_data/Build/Products" "$gen_dir" -type d -name '*.app' -path '*iphoneos*' -print -quit 2>/dev/null || true)"
-          if [ -z "$app_path" ]; then
-            echo "::error::No unsigned iOS .app bundle was produced."
-            exit 1
-          fi
-
-          ipa_root="src-tauri/target/ios-unsigned-ipa"
-          ipa_path="$PWD/src-tauri/target/vnt-tauri-ios-unsigned.ipa"
-          rm -rf "$ipa_root" "$ipa_path"
-          mkdir -p "$ipa_root/Payload"
-          cp -R "$app_path" "$ipa_root/Payload/"
-          find "$ipa_root/Payload" -name '_CodeSignature' -type d -prune -exec rm -rf {} +
-          find "$ipa_root/Payload" -name 'embedded.mobileprovision' -type f -delete
-          (cd "$ipa_root" && zip -qry "$ipa_path" Payload)
-          ls -lh "$ipa_path"
+          cp "$ipa_path" src-tauri/target/vnt-tauri-ios-unsigned.ipa
+          ls -lh "$ipa_path" src-tauri/target/vnt-tauri-ios-unsigned.ipa
 
       - name: Upload iOS artifacts
         uses: actions/upload-artifact@v4

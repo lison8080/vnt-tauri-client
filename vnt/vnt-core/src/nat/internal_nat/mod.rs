@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tcp_ip::{IpStackConfig, IpStackRecv, IpStackSend};
 use tokio::io::{AsyncRead, AsyncWrite};
 
-#[cfg(not(target_os = "android"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod icmp_nat;
 mod tcp_nat;
 mod udp_nat;
@@ -39,7 +39,7 @@ impl InternalNatInbound {
             ..Default::default()
         };
         let (ip_stack, ip_stack_send, ip_stack_recv) = tcp_ip::ip_stack(ip_stack_config)?;
-        #[cfg(not(target_os = "android"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
         icmp_nat::start_icmp_nat(task_group, &ip_stack, no_tun, network.clone()).await?;
         tcp_nat::start_tcp_nat(task_group, &ip_stack, no_tun, network.clone()).await?;
         udp_nat::start_udp_nat(task_group, &ip_stack).await?;

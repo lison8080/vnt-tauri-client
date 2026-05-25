@@ -10,6 +10,8 @@ use vnt_core::{
 };
 
 pub fn to_core_config(config: &NetworkConfig) -> anyhow::Result<CoreConfig> {
+    let config = platform_config(config);
+    let config = &config;
     let server_addr = parse_server_address(config)?;
     let input = compact_list(&config.in_ips)
         .into_iter()
@@ -85,6 +87,26 @@ pub fn to_core_config(config: &NetworkConfig) -> anyhow::Result<CoreConfig> {
     };
     core.check()?;
     Ok(core)
+}
+
+fn platform_config(config: &NetworkConfig) -> NetworkConfig {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let mut config = config.clone();
+        config.no_tun = true;
+        config.no_punch = true;
+        config.no_in_ip_proxy = true;
+        config.allow_port_mapping = false;
+        config.in_ips.clear();
+        config.out_ips.clear();
+        config.port_mappings.clear();
+        config.use_channel_type = "relay".to_string();
+        config
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        config.clone()
+    }
 }
 
 fn parse_server_address(config: &NetworkConfig) -> anyhow::Result<Vec<ProtocolAddress>> {
@@ -240,6 +262,21 @@ mod tests {
         cfg.no_tun = true;
         let core = to_core_config(&cfg).expect("core config");
         assert!(core.no_tun);
+    }
+
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    #[test]
+    fn mobile_conversion_uses_sandbox_safe_mode() {
+        let cfg = config();
+        let core = to_core_config(&cfg).expect("core config");
+
+        assert!(core.no_tun);
+        assert!(core.no_punch);
+        assert!(core.no_nat);
+        assert!(core.input.is_empty());
+        assert!(core.output.is_empty());
+        assert!(core.port_mapping.is_empty());
+        assert!(!core.allow_port_mapping);
     }
 
     #[test]

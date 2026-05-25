@@ -245,6 +245,17 @@ fn storage_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join("vnt-state.json"))
 }
 
+#[cfg(windows)]
+fn runtime_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("无法定位应用数据目录: {error}"))?
+        .join("runtime");
+    fs::create_dir_all(&dir).map_err(|error| format!("无法创建运行时目录: {error}"))?;
+    Ok(dir)
+}
+
 fn load_storage(app: &AppHandle) -> Result<StoredData, String> {
     let path = storage_path(app)?;
     if !path.exists() {
@@ -276,6 +287,25 @@ fn normalize_stored_data(mut data: StoredData) -> StoredData {
 
 fn force_tun_config(config: &mut NetworkConfig) {
     config.core_mode = "tun".to_string();
+}
+
+fn apply_platform_startup_limits(config: &mut NetworkConfig) {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        config.no_tun = true;
+        config.no_punch = true;
+        config.no_in_ip_proxy = true;
+        config.allow_port_mapping = false;
+        config.in_ips.clear();
+        config.out_ips.clear();
+        config.port_mappings.clear();
+        config.use_channel_type = "relay".to_string();
+    }
+
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        let _ = config;
+    }
 }
 
 fn snapshot(app: &AppHandle, runtime: &AppRuntime) -> Result<AppSnapshot, String> {
@@ -665,6 +695,9 @@ fn start_config_inner(
         .cloned()
         .ok_or_else(|| "未找到要连接的配置".to_string())?;
     force_tun_config(&mut config);
+    apply_platform_startup_limits(&mut config);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    push_runtime_log(runtime, "移动端使用无 TUN/无 P2P 沙盒兼容模式");
     validate_config(&config)?;
     push_runtime_log(
         runtime,
@@ -714,8 +747,12 @@ fn start_embedded_config_inner(
     #[cfg(target_os = "android")]
     init_android_logger();
     #[cfg(windows)]
-    embedded::wintun::ensure_wintun_dll()
-        .map_err(|error| format!("准备 wintun.dll 失败: {error}"))?;
+    {
+        let dir = runtime_data_dir(app)?;
+        embedded::wintun::ensure_wintun_dll(&dir)
+            .map_err(|error| format!("准备 wintun.dll 失败: {error}"))?;
+        push_runtime_log(runtime, format!("已准备 wintun.dll：{}", dir.display()));
+    }
 
     let item_key = config.item_key.clone();
     let connection = embedded::manager::EmbeddedConnection::start(config, temporary_exit)

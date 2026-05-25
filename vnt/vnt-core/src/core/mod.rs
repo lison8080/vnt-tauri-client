@@ -324,7 +324,7 @@ impl NetworkManager {
             .start_task(config, receiver, enhanced_outbound)
             .await
     }
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     pub async fn set_tun_network_ip(&self, ip: Ipv4Addr, prefix_len: u8) -> anyhow::Result<()> {
         self.device_io_manager.set_network(ip, prefix_len).await?;
         Ok(())
@@ -334,7 +334,7 @@ impl NetworkManager {
         self.task_group.stop();
         self.app_state.stop_network();
     }
-    #[cfg(not(target_os = "android"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
     pub async fn tun_if_index(&self) -> anyhow::Result<u32> {
         self.device_io_manager.tun_if_index().await
     }

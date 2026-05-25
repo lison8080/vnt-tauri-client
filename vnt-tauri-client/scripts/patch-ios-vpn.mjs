@@ -196,7 +196,7 @@ function patchProject() {
     fail('Generated iOS project does not include PacketTunnel target');
   }
   if (!pbx.includes('VntIosVpnApp')) {
-    fail('Generated iOS project does not include VntIosVpnApp sources');
+    console.warn('Generated iOS project does not list VntIosVpnApp explicitly; xcodebuild will validate the synchronized source group.');
   }
   if (!pbx.includes('VntIosVpnBridge.swift')) {
     console.warn('Generated iOS project does not list VntIosVpnBridge.swift explicitly; xcodebuild will validate the synchronized source group.');

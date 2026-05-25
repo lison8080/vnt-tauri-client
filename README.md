@@ -42,3 +42,12 @@ npm run tauri -- build
 - iOS Rust static library
 
 The workflow compiles the app against the in-repository `vnt/vnt-core` source.
+
+Tagged builds publish a GitHub Release automatically. To publish a release:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Release assets are uploaded as zipped platform artifacts. Android includes APK output. iOS currently uploads the compiled Rust static library; producing a signed `.ipa` additionally requires Apple signing secrets and a generated iOS Xcode project.

@@ -22,6 +22,10 @@ defaults:
 permissions:
   contents: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   desktop:
     name: Desktop ${{ matrix.name }}
@@ -92,7 +96,9 @@ jobs:
           name: vnt-tauri-${{ matrix.name }}
           path: |
             vnt-tauri-client/src-tauri/target/release/bundle/**
+            vnt-tauri-client/src-tauri/target/universal-apple-darwin/release/bundle/**
             !vnt-tauri-client/src-tauri/target/release/bundle/**/*.dSYM/**
+            !vnt-tauri-client/src-tauri/target/universal-apple-darwin/release/bundle/**/*.dSYM/**
           if-no-files-found: warn
 
   android:
@@ -190,3 +196,35 @@ jobs:
           path: |
             vnt-tauri-client/src-tauri/target/aarch64-apple-ios/release/libvnt_tauri_desktop_lib.a
           if-no-files-found: warn
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - desktop
+      - android
+      - ios
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Package release assets
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          for artifact in release-artifacts/*; do
+            [ -d "$artifact" ] || continue
+            name="$(basename "$artifact")"
+            (cd "$artifact" && zip -r "../../release-assets/${name}.zip" .)
+          done
+          find release-assets -type f -maxdepth 1 -print
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

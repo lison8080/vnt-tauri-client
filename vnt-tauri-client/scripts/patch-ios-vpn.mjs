@@ -224,9 +224,6 @@ function patchProject() {
   if (!pbx.includes('PRODUCT_BUNDLE_IDENTIFIER')) {
     fail('Generated iOS project does not look like an Xcode project');
   }
-  if (!pbx.includes('PacketTunnel')) {
-    fail('Generated iOS project does not include PacketTunnel target');
-  }
   if (!pbx.includes('VntIosVpnApp')) {
     console.warn('Generated iOS project does not list VntIosVpnApp explicitly; xcodebuild will validate the synchronized source group.');
   }
@@ -234,7 +231,7 @@ function patchProject() {
     console.warn('Generated iOS project does not list VntIosVpnBridge.swift explicitly; xcodebuild will validate the synchronized source group.');
   }
   if (!pbx.includes('PacketTunnelProvider.swift')) {
-    console.warn('Generated iOS project does not list PacketTunnelProvider.swift explicitly; xcodebuild will validate the synchronized source group.');
+    console.warn('Generated iOS project does not include PacketTunnelProvider.swift; unsigned CI IPA will not embed the PacketTunnel extension.');
   }
 }
 

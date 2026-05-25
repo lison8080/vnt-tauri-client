@@ -103,6 +103,6 @@ public func vnt_ios_vpn_stop() -> Int32 {
 }
 
 @_cdecl("vnt_ios_vpn_last_error")
-public func vnt_ios_vpn_last_error() -> UnsafePointer<CChar>? {
+public func vnt_ios_vpn_last_error() -> UnsafeMutablePointer<CChar>? {
   strdup(VntIosVpnState.shared.getError())
 }

@@ -207,10 +207,6 @@ jobs:
           cp src-tauri/ios/PacketTunnelProvider.swift src-tauri/gen/apple/VntIosVpnTunnel/PacketTunnelProvider.swift
           node scripts/patch-ios-vpn.mjs
 
-      - name: Build iOS Rust library
-        working-directory: vnt-tauri-client/src-tauri
-        run: cargo build --release --target aarch64-apple-ios
-
       - name: Build unsigned iOS IPA
         run: |
           set -euo pipefail
@@ -229,7 +225,6 @@ jobs:
         with:
           name: vnt-tauri-ios
           path: |
-            vnt-tauri-client/src-tauri/target/aarch64-apple-ios/release/libvnt_tauri_desktop_lib.a
             vnt-tauri-client/src-tauri/target/vnt-tauri-ios-unsigned.ipa
           if-no-files-found: warn
 

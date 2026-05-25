@@ -133,8 +133,15 @@ impl DeviceIOManager {
 fn create_tun(config: DeviceConfig) -> anyhow::Result<AsyncDevice> {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
-        let _ = config;
-        bail!("creating TUN device is unsupported on this target")
+        if let Some(fd) = config.tun_fd {
+            // SAFETY: The platform VPN layer owns creating and configuring the TUN
+            // endpoint. The caller must pass a valid open fd for that endpoint.
+            unsafe {
+                return Ok(AsyncDevice::from_fd(fd)?);
+            }
+        }
+
+        bail!("creating TUN device on this target requires a platform VPN file descriptor")
     }
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]

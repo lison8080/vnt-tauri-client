@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "clean": "rimraf dist src-tauri/target",
     "lint": "tsc --noEmit",
+    "release:next": "node ../scripts/release-next.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

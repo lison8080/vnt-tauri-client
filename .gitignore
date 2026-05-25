@@ -1,0 +1,13 @@
+vnt-tauri-client/node_modules/
+vnt-tauri-client/build/
+vnt-tauri-client/dist/
+vnt-tauri-client/src-tauri/target/
+vnt-tauri-client/src-tauri/target-local/
+vnt-tauri-client/src-tauri/gen/schemas/
+vnt-tauri-client/src-tauri/binaries/*
+!vnt-tauri-client/src-tauri/binaries/README.md
+vnt-tauri-client/coverage/
+.DS_Store
+*.log
+.env*
+!.env.example

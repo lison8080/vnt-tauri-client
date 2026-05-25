@@ -1,0 +1,6 @@
+{
+  "name": "VNT Modern UI Redesign",
+  "description": "A modern, flat, mobile-first UI redesign for the VNT Virtual Network tool.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

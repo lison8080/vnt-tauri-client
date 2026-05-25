@@ -1,0 +1,4 @@
+[submodule "vnt"]
+	path = vnt
+	url = https://github.com/vnt-dev/vnt.git
+	branch = v2

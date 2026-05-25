@@ -1,0 +1,36 @@
+[package]
+name = "vnt-tauri-desktop"
+version = "0.1.0"
+description = "VNT Windows desktop client"
+authors = ["VNT"]
+edition = "2021"
+
+[lib]
+name = "vnt_tauri_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "vnt-tauri-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.6.2", features = [] }
+
+[dependencies]
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+tauri = { version = "2.11.2", features = ["tray-icon"] }
+uuid = { version = "1.11", features = ["v4"] }
+log = "0.4"
+ipnet = { version = "2.11", features = ["serde"] }
+route_manager = "0.2.11"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"] }
+vnt-core = { path = "../../vnt/vnt-core" }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.13"
+jni = "0.21"
+ndk-context = "0.1"

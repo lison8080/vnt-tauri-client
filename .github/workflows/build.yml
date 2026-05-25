@@ -1,0 +1,198 @@
+name: Build Tauri App
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: '22'
+
+defaults:
+  run:
+    shell: bash
+    working-directory: vnt-tauri-client
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    name: Desktop ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-22.04
+            build_args: --verbose
+          - name: windows-x64
+            os: windows-latest
+            build_args: --verbose
+          - name: macos-universal
+            os: macos-latest
+            build_args: --target universal-apple-darwin --no-sign --verbose
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: vnt-tauri-client/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            protobuf-compiler
+
+      - name: Install Windows dependencies
+        if: runner.os == 'Windows'
+        run: choco install protoc -y
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install protobuf
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Build app
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: vnt-tauri-client
+          args: ${{ matrix.build_args }}
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vnt-tauri-${{ matrix.name }}
+          path: |
+            vnt-tauri-client/src-tauri/target/release/bundle/**
+            !vnt-tauri-client/src-tauri/target/release/bundle/**/*.dSYM/**
+          if-no-files-found: warn
+
+  android:
+    name: Android
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: vnt-tauri-client/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install protobuf
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Initialize Android project files
+        run: |
+          if [ ! -d src-tauri/gen/android/app ]; then
+            npm run tauri -- android init --ci
+          fi
+
+      - name: Build Android APK
+        run: npm run tauri -- android build --apk --target aarch64
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vnt-tauri-android
+          path: |
+            vnt-tauri-client/src-tauri/gen/android/app/build/outputs/**/*.apk
+          if-no-files-found: warn
+
+  ios:
+    name: iOS Rust core
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: vnt-tauri-client/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - name: Install protobuf
+        run: brew install protobuf
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Build iOS Rust library
+        working-directory: vnt-tauri-client/src-tauri
+        run: cargo build --release --target aarch64-apple-ios
+
+      - name: Upload iOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vnt-tauri-ios
+          path: |
+            vnt-tauri-client/src-tauri/target/aarch64-apple-ios/release/libvnt_tauri_desktop_lib.a
+          if-no-files-found: warn

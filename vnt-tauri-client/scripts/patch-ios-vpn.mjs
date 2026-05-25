@@ -94,8 +94,13 @@ function patchProject() {
   if (!pbx.includes('PRODUCT_BUNDLE_IDENTIFIER')) {
     fail('Generated iOS project does not look like an Xcode project');
   }
+  if (!pbx.includes('PacketTunnel')) {
+    fail('Generated iOS project does not include PacketTunnel target');
+  }
+  if (!pbx.includes('VntIosVpnBridge.swift')) {
+    fail('Generated iOS project does not include the iOS VPN bridge');
+  }
 }
 
-copyBridgeSources();
 patchProject();
-console.log('iOS VPN bridge sources patched into generated Xcode project');
+console.log('iOS VPN Xcode project includes PacketTunnel target and bridge sources');

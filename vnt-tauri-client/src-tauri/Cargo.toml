@@ -26,7 +26,6 @@ tauri = { version = "2.11.2", features = ["tray-icon"] }
 uuid = { version = "1.11", features = ["v4"] }
 log = "0.4"
 ipnet = { version = "2.11", features = ["serde"] }
-route_manager = "0.2.11"
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"] }
 vnt-core = { path = "../../vnt/vnt-core" }
 

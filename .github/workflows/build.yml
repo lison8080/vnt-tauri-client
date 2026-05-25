@@ -158,7 +158,7 @@ jobs:
           if-no-files-found: warn
 
   ios:
-    name: iOS Rust core
+    name: iOS unsigned IPA
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -185,9 +185,88 @@ jobs:
       - name: Type check
         run: npm run lint
 
+      - name: Initialize iOS project files
+        run: |
+          set -euo pipefail
+          if ! npm run tauri -- ios init --help >/dev/null 2>&1; then
+            echo "::error::The Tauri iOS CLI is not available on this macOS runner."
+            exit 1
+          fi
+          if [ ! -d src-tauri/gen/apple ]; then
+            npm run tauri -- ios init --ci
+          fi
+
       - name: Build iOS Rust library
         working-directory: vnt-tauri-client/src-tauri
         run: cargo build --release --target aarch64-apple-ios
+
+      - name: Build unsigned iOS IPA
+        run: |
+          set -euo pipefail
+
+          npm run build
+
+          gen_dir="src-tauri/gen/apple"
+          derived_data="$PWD/src-tauri/target/ios-derived-data"
+          mkdir -p "$derived_data"
+
+          extract_first_scheme() {
+            python3 -c 'import json, sys; data = json.load(sys.stdin); root = data.get("workspace") or data.get("project") or {}; schemes = root.get("schemes") or []; print(schemes[0] if schemes else "")'
+          }
+
+          workspace="$(find "$gen_dir" -name '*.xcworkspace' -print -quit)"
+          project="$(find "$gen_dir" -name '*.xcodeproj' -print -quit)"
+
+          if [ -n "$workspace" ]; then
+            scheme="$(xcodebuild -list -json -workspace "$workspace" | extract_first_scheme)"
+            [ -n "$scheme" ] || { echo "::error::No Xcode scheme found in $workspace"; exit 1; }
+            xcodebuild \
+              -workspace "$workspace" \
+              -scheme "$scheme" \
+              -configuration Release \
+              -sdk iphoneos \
+              -destination 'generic/platform=iOS' \
+              -derivedDataPath "$derived_data" \
+              CODE_SIGN_STYLE=Manual \
+              DEVELOPMENT_TEAM= \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY=""
+          elif [ -n "$project" ]; then
+            scheme="$(xcodebuild -list -json -project "$project" | extract_first_scheme)"
+            [ -n "$scheme" ] || { echo "::error::No Xcode scheme found in $project"; exit 1; }
+            xcodebuild \
+              -project "$project" \
+              -scheme "$scheme" \
+              -configuration Release \
+              -sdk iphoneos \
+              -destination 'generic/platform=iOS' \
+              -derivedDataPath "$derived_data" \
+              CODE_SIGN_STYLE=Manual \
+              DEVELOPMENT_TEAM= \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY=""
+          else
+            echo "::error::No generated iOS Xcode project found under $gen_dir"
+            exit 1
+          fi
+
+          app_path="$(find "$derived_data/Build/Products/Release-iphoneos" "$gen_dir" -type d -name '*.app' -print -quit 2>/dev/null || true)"
+          if [ -z "$app_path" ]; then
+            echo "::error::No unsigned iOS .app bundle was produced."
+            exit 1
+          fi
+
+          ipa_root="src-tauri/target/ios-unsigned-ipa"
+          ipa_path="$PWD/src-tauri/target/vnt-tauri-ios-unsigned.ipa"
+          rm -rf "$ipa_root" "$ipa_path"
+          mkdir -p "$ipa_root/Payload"
+          cp -R "$app_path" "$ipa_root/Payload/"
+          find "$ipa_root/Payload" -name '_CodeSignature' -type d -prune -exec rm -rf {} +
+          find "$ipa_root/Payload" -name 'embedded.mobileprovision' -type f -delete
+          (cd "$ipa_root" && zip -qry "$ipa_path" Payload)
+          ls -lh "$ipa_path"
 
       - name: Upload iOS artifacts
         uses: actions/upload-artifact@v4
@@ -195,6 +274,7 @@ jobs:
           name: vnt-tauri-ios
           path: |
             vnt-tauri-client/src-tauri/target/aarch64-apple-ios/release/libvnt_tauri_desktop_lib.a
+            vnt-tauri-client/src-tauri/target/vnt-tauri-ios-unsigned.ipa
           if-no-files-found: warn
 
   release:
@@ -216,12 +296,28 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-assets
+
+          while IFS= read -r -d '' file; do
+            artifact="$(printf '%s\n' "$file" | cut -d/ -f2)"
+            base="$(basename "$file")"
+            safe_base="${base// /_}"
+            cp "$file" "release-assets/${artifact}-${safe_base}"
+          done < <(find release-artifacts -type f \( \
+            -name '*.exe' -o \
+            -name '*.msi' -o \
+            -name '*.deb' -o \
+            -name '*.AppImage' -o \
+            -name '*.dmg' -o \
+            -name '*.apk' -o \
+            -name '*.ipa' \
+          \) -print0)
+
           for artifact in release-artifacts/*; do
             [ -d "$artifact" ] || continue
             name="$(basename "$artifact")"
             (cd "$artifact" && zip -r "../../release-assets/${name}.zip" .)
           done
-          find release-assets -type f -maxdepth 1 -print
+          find release-assets -maxdepth 1 -type f -print
 
       - name: Publish release
         uses: softprops/action-gh-release@v2

@@ -9,8 +9,8 @@ It does not require prebuilt `vnt-cli` or `vn-link-cli` sidecar binaries.
 - Tauri Rust backend that manages `vnt-core` in process.
 - Client configuration, startup settings, tray integration, embedded status,
   device overview, logs, and route/status views.
-- GitHub Actions workflow for Windows/Linux desktop bundles, Android APKs, and
-  an iOS Rust library build check.
+- GitHub Actions workflow for Windows/Linux/macOS desktop bundles, Android APKs,
+  an unsigned iOS IPA, and an iOS Rust library build check.
 
 ## Repository Layout
 
@@ -56,8 +56,8 @@ Runtime notes:
   - Until those bridges are finished, mobile `noTun` mode is the only embedded
     mode that can avoid the TUN startup error.
 
-CI note: the current Tauri CLI package exposes Android mobile app commands on
-Linux, but not top-level iOS app commands from the Linux-hosted npm binary. The
-workflow therefore validates iOS by compiling the Rust static library for
-`aarch64-apple-ios`; producing signed `.ipa` artifacts still requires adding an
-iOS project/signing setup.
+CI note: iOS packaging runs on the macOS GitHub Actions runner. The workflow
+generates the Tauri iOS project, builds an unsigned iPhoneOS `.app` bundle with
+Xcode signing disabled, and packages it as `vnt-tauri-ios-unsigned.ipa`. This IPA
+is meant for later signing/re-signing; installing on physical devices still
+requires a valid Apple signing identity and provisioning profile.

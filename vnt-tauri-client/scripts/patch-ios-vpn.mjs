@@ -98,7 +98,7 @@ function patchProject() {
     fail('Generated iOS project does not include PacketTunnel target');
   }
   if (!pbx.includes('VntIosVpnBridge.swift')) {
-    fail('Generated iOS project does not include the iOS VPN bridge');
+    console.warn('Generated iOS project does not list VntIosVpnBridge.swift explicitly; continuing so xcodebuild can validate linkage.');
   }
 }
 

@@ -4,7 +4,7 @@ This repository combines the VNT core source and the Tauri client in one build w
 
 ## Layout
 
-- `vnt/`: VNT core source, tracked as a Git submodule.
+- `vnt/`: VNT core source.
 - `vnt-tauri-client/`: Tauri desktop/mobile client.
 
 The app depends on the core through a local Cargo path:
@@ -18,14 +18,8 @@ No prebuilt VNT core executable is required.
 ## Clone
 
 ```bash
-git clone --recurse-submodules <repo-url>
+git clone <repo-url>
 cd vnt
-```
-
-If the repository was cloned without submodules:
-
-```bash
-git submodule update --init --recursive
 ```
 
 ## Build locally
@@ -47,4 +41,4 @@ npm run tauri -- build
 - Android APK
 - iOS Rust static library
 
-The workflow checks out submodules recursively so the app can compile against `vnt/vnt-core`.
+The workflow compiles the app against the in-repository `vnt/vnt-core` source.

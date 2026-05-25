@@ -1,4 +1,7 @@
-use std::{fs, io};
+use std::io;
+
+#[cfg(target_os = "linux")]
+use std::fs;
 
 pub fn get() -> io::Result<String> {
     platform_id()

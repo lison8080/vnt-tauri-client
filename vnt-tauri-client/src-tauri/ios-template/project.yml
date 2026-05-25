@@ -32,6 +32,7 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: VntIosVpnApp
       - path: Assets.xcassets
       - path: Externals
       - path: {{app.name}}_iOS

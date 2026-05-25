@@ -193,8 +193,8 @@ jobs:
             exit 1
           fi
           if [ ! -d src-tauri/gen/apple ]; then
-            mkdir -p src-tauri/gen/apple/Sources/vnt-tauri-desktop src-tauri/gen/apple/VntIosVpnTunnel
-            cp src-tauri/ios/VntIosVpnBridge.swift src-tauri/gen/apple/Sources/vnt-tauri-desktop/VntIosVpnBridge.swift
+            mkdir -p src-tauri/gen/apple/VntIosVpnApp src-tauri/gen/apple/VntIosVpnTunnel
+            cp src-tauri/ios/VntIosVpnBridge.swift src-tauri/gen/apple/VntIosVpnApp/VntIosVpnBridge.swift
             cp src-tauri/ios/PacketTunnelProvider.swift src-tauri/gen/apple/VntIosVpnTunnel/PacketTunnelProvider.swift
             npm run tauri -- ios init --ci
           fi
@@ -202,8 +202,8 @@ jobs:
       - name: Patch iOS VPN bridge
         run: |
           set -euo pipefail
-          mkdir -p src-tauri/gen/apple/Sources/vnt-tauri-desktop src-tauri/gen/apple/VntIosVpnTunnel
-          cp src-tauri/ios/VntIosVpnBridge.swift src-tauri/gen/apple/Sources/vnt-tauri-desktop/VntIosVpnBridge.swift
+          mkdir -p src-tauri/gen/apple/VntIosVpnApp src-tauri/gen/apple/VntIosVpnTunnel
+          cp src-tauri/ios/VntIosVpnBridge.swift src-tauri/gen/apple/VntIosVpnApp/VntIosVpnBridge.swift
           cp src-tauri/ios/PacketTunnelProvider.swift src-tauri/gen/apple/VntIosVpnTunnel/PacketTunnelProvider.swift
           node scripts/patch-ios-vpn.mjs
 

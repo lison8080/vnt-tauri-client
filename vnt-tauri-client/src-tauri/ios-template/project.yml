@@ -216,6 +216,4 @@ targets:
         DEVELOPMENT_TEAM: {{apple.development-team}}
         {{/if}}
     dependencies:
-      - framework: {{ lib-output-file-name }}
-        embed: false
       - sdk: NetworkExtension.framework

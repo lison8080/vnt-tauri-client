@@ -170,6 +170,37 @@ function ensureGeneratedAppleFiles(metadata) {
   writeIfChanged(path.join(tunnelDir, 'PacketTunnel.entitlements'), networkExtensionEntitlements());
 }
 
+function pruneGeneratedProject(metadata) {
+  const projectSpec = path.join(genApple, 'project.yml');
+  if (!fs.existsSync(projectSpec)) {
+    fail('Unable to locate generated iOS project.yml');
+  }
+
+  const appTarget = `${metadata.appName}_iOS:`;
+  let inAppTarget = false;
+  let removed = 0;
+  const lines = fs.readFileSync(projectSpec, 'utf8').split('\n');
+  const next = lines.filter((line) => {
+    if (line === `  ${appTarget}`) {
+      inAppTarget = true;
+      return true;
+    }
+    if (inAppTarget && /^  [A-Za-z0-9_-]+:/.test(line) && line !== `  ${appTarget}`) {
+      inAppTarget = false;
+    }
+    if (inAppTarget && line.trim() === '- path: VntIosVpnTunnel') {
+      removed += 1;
+      return false;
+    }
+    return true;
+  }).join('\n');
+
+  if (removed > 0) {
+    fs.writeFileSync(projectSpec, next, 'utf8');
+    console.log(`Removed ${removed} PacketTunnel source leak from ${path.relative(root, projectSpec)}`);
+  }
+}
+
 function regenerateProject() {
   const result = spawnSync('xcodegen', ['generate', '--spec', 'project.yml'], {
     cwd: genApple,
@@ -209,6 +240,7 @@ function patchProject() {
 
 const metadata = loadProjectMetadata();
 ensureGeneratedAppleFiles(metadata);
+pruneGeneratedProject(metadata);
 regenerateProject();
 patchProject();
 console.log('iOS VPN Xcode project includes PacketTunnel target and bridge sources');

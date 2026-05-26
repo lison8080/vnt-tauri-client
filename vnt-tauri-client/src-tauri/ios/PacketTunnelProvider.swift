@@ -40,7 +40,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     completionHandler: @escaping (Error?) -> Void
   ) {
     activeProvider = self
-    let profileJson = (protocolConfiguration.providerConfiguration?["profileJson"] as? String) ?? "{}"
+    let tunnelProtocol = protocolConfiguration as? NETunnelProviderProtocol
+    let profileJson = (tunnelProtocol?.providerConfiguration?["profileJson"] as? String) ?? "{}"
     let profile = VntIosVpnProfile.decode(profileJson)
     sessionId = profileJson.withCString { vntIosPacketFlowStart($0, vnt_ios_packet_flow_write) }
     guard sessionId != 0 else {

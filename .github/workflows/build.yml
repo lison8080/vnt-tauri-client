@@ -208,11 +208,12 @@ jobs:
           node scripts/patch-ios-vpn.mjs
 
       - name: Inspect generated iOS project
-        if: runner.debug == '1'
         run: |
           set -euo pipefail
           echo '--- project.yml PacketTunnel block ---'
           sed -n '/  PacketTunnel:/,$p' src-tauri/gen/apple/project.yml
+          echo '--- project.yml app target source paths ---'
+          sed -n '/  vnt-tauri-desktop_iOS:/,/  PacketTunnel:/p' src-tauri/gen/apple/project.yml | grep -E 'path:|target: PacketTunnel|embed: true|info:|entitlements:' || true
           echo '--- pbxproj PacketTunnel references ---'
           grep -nE 'PacketTunnel|VntIosVpnTunnel|productType|PRODUCT_NAME|PRODUCT_BUNDLE_IDENTIFIER|INFOPLIST_FILE|WRAPPER_EXTENSION|EXECUTABLE_NAME' src-tauri/gen/apple/*.xcodeproj/project.pbxproj || true
 
@@ -220,7 +221,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          npm run tauri -- ios build --ci --no-sign --target aarch64
+          if ! npm run tauri -- ios build --ci --no-sign --target aarch64; then
+            echo '--- build directory after failed tauri ios build ---'
+            find src-tauri/gen/apple/build -maxdepth 6 -print || true
+            echo '--- project.yml after failed tauri ios build ---'
+            sed -n '/  vnt-tauri-desktop_iOS:/,/  PacketTunnel:/p' src-tauri/gen/apple/project.yml | grep -E 'path:|target: PacketTunnel|embed: true|info:|entitlements:' || true
+            exit 1
+          fi
           ipa_path="$(find src-tauri/gen/apple/build -type f -name '*.ipa' -print -quit)"
           if [ -z "$ipa_path" ]; then
             echo "::error::No unsigned iOS IPA was produced."

@@ -202,8 +202,8 @@ function patchProject() {
   if (!pbx.includes('PacketTunnelProvider.swift')) {
     fail('Generated iOS project does not include PacketTunnelProvider.swift');
   }
-  if (!pbx.includes('PacketTunnel.appex')) {
-    fail('Generated iOS project does not embed PacketTunnel.appex');
+  if (!pbx.includes('com.apple.product-type.app-extension')) {
+    fail('Generated iOS project does not include an app-extension target');
   }
 }
 

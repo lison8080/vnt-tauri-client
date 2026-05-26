@@ -102,6 +102,8 @@ targets:
       - sdk: NetworkExtension.framework{{#if this.ios-frameworks}}{{~#each ios-frameworks}}
       - sdk: {{this}}.framework{{/each}}{{/if}}
       - sdk: WebKit.framework
+      - target: PacketTunnel
+        embed: true
     preBuildScripts:
       {{~#each ios-pre-build-scripts}}{{#if this.path}}
       - path {{this.path}}{{/if}}{{#if this.script}}
@@ -170,3 +172,55 @@ targets:
         discoveredDependencyFile: {{this.discovered-dependency-file}}{{/if}}
       {{~/each~}}
     {{~/if}}
+  PacketTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: VntIosVpnTunnel
+        excludes:
+          - PacketTunnelInfo.plist
+          - PacketTunnel.entitlements
+    info:
+      path: VntIosVpnTunnel/PacketTunnelInfo.plist
+      properties:
+        CFBundleDisplayName: VNT Packet Tunnel
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIdentifier: {{app.identifier}}.PacketTunnel
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundlePackageType: $(PRODUCT_BUNDLE_PACKAGE_TYPE)
+        CFBundleShortVersionString: {{apple.bundle-version-short}}
+        CFBundleVersion: "{{apple.bundle-version}}"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
+    entitlements:
+      path: VntIosVpnTunnel/PacketTunnel.entitlements
+      properties:
+        com.apple.developer.networking.networkextension:
+          - packet-tunnel-provider
+    settings:
+      base:
+        PRODUCT_NAME: PacketTunnel
+        PRODUCT_BUNDLE_IDENTIFIER: {{app.identifier}}.PacketTunnel
+        ENABLE_BITCODE: false
+        ARCHS: [{{join ios-valid-archs}}]
+        VALID_ARCHS: {{~#each ios-valid-archs}} {{this}} {{/each}}
+        LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
+        LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
+        EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
+        {{#if apple.development-team}}
+        DEVELOPMENT_TEAM: {{apple.development-team}}
+        {{/if}}
+    dependencies:
+      - framework: {{ lib-output-file-name }}
+        embed: false
+      - sdk: NetworkExtension.framework
+    preBuildScripts:
+      - script: {{ tauri-binary }} {{ tauri-binary-args-str }} -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
+        name: Build Rust Code
+        basedOnDependencyAnalysis: false
+        outputFiles:
+          - $(SRCROOT)/Externals/x86_64/${CONFIGURATION}/{{ lib-output-file-name }}
+          - $(SRCROOT)/Externals/arm64/${CONFIGURATION}/{{ lib-output-file-name }}

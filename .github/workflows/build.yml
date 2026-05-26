@@ -219,6 +219,7 @@ jobs:
           fi
           cp "$ipa_path" src-tauri/target/vnt-tauri-ios-unsigned.ipa
           ls -lh "$ipa_path" src-tauri/target/vnt-tauri-ios-unsigned.ipa
+          node scripts/assert-ios-packet-tunnel.mjs src-tauri/target/vnt-tauri-ios-unsigned.ipa
 
       - name: Upload iOS artifacts
         uses: actions/upload-artifact@v4

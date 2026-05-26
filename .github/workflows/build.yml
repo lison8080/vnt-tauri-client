@@ -207,6 +207,15 @@ jobs:
           cp src-tauri/ios/PacketTunnelProvider.swift src-tauri/gen/apple/VntIosVpnTunnel/PacketTunnelProvider.swift
           node scripts/patch-ios-vpn.mjs
 
+      - name: Inspect generated iOS project
+        if: runner.debug == '1'
+        run: |
+          set -euo pipefail
+          echo '--- project.yml PacketTunnel block ---'
+          sed -n '/  PacketTunnel:/,$p' src-tauri/gen/apple/project.yml
+          echo '--- pbxproj PacketTunnel references ---'
+          grep -nE 'PacketTunnel|VntIosVpnTunnel|productType|PRODUCT_NAME|PRODUCT_BUNDLE_IDENTIFIER|INFOPLIST_FILE|WRAPPER_EXTENSION|EXECUTABLE_NAME' src-tauri/gen/apple/*.xcodeproj/project.pbxproj || true
+
       - name: Build unsigned iOS IPA
         run: |
           set -euo pipefail

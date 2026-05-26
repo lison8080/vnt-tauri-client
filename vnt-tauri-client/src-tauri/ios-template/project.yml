@@ -1,6 +1,7 @@
 name: {{app.name}}
 options:
   bundleIdPrefix: {{app.identifier}}
+  projectFormat: xcode15_3
   deploymentTarget:
     iOS: {{apple.ios-version}}
 fileGroups: [{{join file-groups}}]
@@ -176,10 +177,7 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - path: VntIosVpnTunnel
-        excludes:
-          - PacketTunnelInfo.plist
-          - PacketTunnel.entitlements
+      - path: VntIosVpnTunnel/PacketTunnelProvider.swift
     info:
       path: VntIosVpnTunnel/PacketTunnelInfo.plist
       properties:
@@ -202,7 +200,11 @@ targets:
     settings:
       base:
         PRODUCT_NAME: PacketTunnel
+        PRODUCT_MODULE_NAME: PacketTunnel
+        EXECUTABLE_NAME: PacketTunnel
         PRODUCT_BUNDLE_IDENTIFIER: {{app.identifier}}.PacketTunnel
+        INFOPLIST_FILE: VntIosVpnTunnel/PacketTunnelInfo.plist
+        APPLICATION_EXTENSION_API_ONLY: true
         ENABLE_BITCODE: false
         ARCHS: [{{join ios-valid-archs}}]
         VALID_ARCHS: {{~#each ios-valid-archs}} {{this}} {{/each}}

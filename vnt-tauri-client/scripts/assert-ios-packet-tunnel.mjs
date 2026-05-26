@@ -19,7 +19,7 @@ function assertTemplate() {
     ['main app embeds PacketTunnel target', /- target: PacketTunnel\s+embed: true/s],
     ['PacketTunnel target exists', /\n  PacketTunnel:\n/s],
     ['PacketTunnel target is an app extension', /\n  PacketTunnel:[\s\S]*?\n    type: app-extension\n/s],
-    ['PacketTunnel compiles generated Swift source folder', /\n  PacketTunnel:[\s\S]*?- path: VntIosVpnTunnel\n/s],
+    ['PacketTunnel compiles PacketTunnelProvider.swift', /\n  PacketTunnel:[\s\S]*?- path: VntIosVpnTunnel\/PacketTunnelProvider\.swift\n/s],
     ['PacketTunnel links NetworkExtension.framework', /\n  PacketTunnel:[\s\S]*?- sdk: NetworkExtension\.framework\n/s],
   ];
 

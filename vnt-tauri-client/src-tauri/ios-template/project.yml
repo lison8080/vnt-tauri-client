@@ -131,7 +131,7 @@ targets:
         outputFiles:
           - $(SRCROOT)/Externals/x86_64/${CONFIGURATION}/{{ lib-output-file-name }}
           - $(SRCROOT)/Externals/arm64/${CONFIGURATION}/{{ lib-output-file-name }}
-    {{~#if ios-post-compile-scripts}}
+    {{#if ios-post-compile-scripts}}
     postCompileScripts:
       {{~#each ios-post-compile-scripts}}{{#if this.path}}
       - path {{this.path}}{{/if}}{{#if this.script}}
@@ -150,9 +150,9 @@ targets:
         runOnlyWhenInstalling: {{this.run-only-when-installing}}{{/if}}{{#if this.based-on-dependency-analysis}}
         basedOnDependencyAnalysis: {{this.based-on-dependency-analysis}}{{/if}}{{#if this.discovered-dependency-file}}
         discoveredDependencyFile: {{this.discovered-dependency-file}}{{/if}}
-      {{~/each~}}
-    {{~/if~}}
-    {{~#if ios-post-build-scripts}}
+      {{~/each}}
+    {{/if}}
+    {{#if ios-post-build-scripts}}
     postBuildScripts:
       {{~#each ios-post-build-scripts}}{{#if this.path}}
       - path {{this.path}}{{/if}}{{#if this.script}}
@@ -171,8 +171,8 @@ targets:
         runOnlyWhenInstalling: {{this.run-only-when-installing}}{{/if}}{{#if this.based-on-dependency-analysis}}
         basedOnDependencyAnalysis: {{this.based-on-dependency-analysis}}{{/if}}{{#if this.discovered-dependency-file}}
         discoveredDependencyFile: {{this.discovered-dependency-file}}{{/if}}
-      {{~/each~}}
-    {{~/if}}
+      {{~/each}}
+    {{/if}}
   PacketTunnel:
     type: app-extension
     platform: iOS

@@ -18,6 +18,7 @@ function assertTemplate() {
   const checks = [
     ['main app embeds PacketTunnel target', /- target: PacketTunnel\s+embed: true/s],
     ['PacketTunnel target exists', /\n  PacketTunnel:\n/s],
+    ['PacketTunnel target starts on a clean YAML line', /^\s{2}PacketTunnel:\s*$/m],
     ['PacketTunnel target is an app extension', /\n  PacketTunnel:[\s\S]*?\n    type: app-extension\n/s],
     ['PacketTunnel compiles PacketTunnelProvider.swift', /\n  PacketTunnel:[\s\S]*?- path: VntIosVpnTunnel\/PacketTunnelProvider\.swift\n/s],
     ['PacketTunnel links NetworkExtension.framework', /\n  PacketTunnel:[\s\S]*?- sdk: NetworkExtension\.framework\n/s],

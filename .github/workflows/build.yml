@@ -206,6 +206,7 @@ jobs:
           cp src-tauri/ios/VntIosVpnBridge.swift src-tauri/gen/apple/VntIosVpnApp/VntIosVpnBridge.swift
           cp src-tauri/ios/PacketTunnelProvider.swift src-tauri/gen/apple/VntIosVpnTunnel/PacketTunnelProvider.swift
           node scripts/patch-ios-vpn.mjs
+          node scripts/assert-ios-packet-tunnel.mjs
 
       - name: Inspect generated iOS project
         run: |
